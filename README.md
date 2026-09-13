@@ -22,7 +22,7 @@ This project is primarily for learning purposes. I have worked with time synchro
 
 ## Milestones
 
-As far as I am aware, Raspberry Pis send requests on port 123, the default port for NTP communication.
+Raspberry Pis send requests on port 123, the default port for NTP communication.
 
 The goal is to create a Python program that listens for requests on this port and sends a custom packet containing time information back to the Pi.
 
