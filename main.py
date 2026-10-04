@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Minimal NTP Server
+ntp-from-scratch
 Responds to NTP requests on UDP port 123 with custom or current system time.
 """
 
@@ -214,8 +214,8 @@ def build_ntp_response(origin_time, receive_time, transmit_time):
               help='UDP port to listen on (default: 123, requires root privileges)')
 def main(custom_time, port):
     """
-    Minimal NTP Server
-    
+    ntp-from-scratch
+
     Responds to NTP requests with custom or current system time.
     Custom time can be set via --time/-t CLI argument or NTP_CUSTOM_TIME environment variable.
     """
@@ -226,7 +226,7 @@ def main(custom_time, port):
     # Track server start time for calculating offsets
     server_start_time = time.time()
     
-    print(f"NTP server starting on port {port}")
+    print(f"ntp-from-scratch starting on port {port}")
     if use_custom_time:
         print(f"Using custom time: {base_time.isoformat()}")
     else:
@@ -238,7 +238,7 @@ def main(custom_time, port):
     try:
         # Bind to the specified port
         server_socket.bind(('0.0.0.0', port))
-        print(f"NTP server is running on port {port}")
+        print(f"ntp-from-scratch is running on port {port}")
         print("Waiting for NTP requests...")
         
         while True:
@@ -291,7 +291,7 @@ def main(custom_time, port):
         print("Please run with sudo or as administrator.")
         return 1
     except KeyboardInterrupt:
-        print("\nShutting down NTP server...")
+        print("\nShutting down ntp-from-scratch...")
         return 0
     except Exception as e:
         print(f"Error: {e}")

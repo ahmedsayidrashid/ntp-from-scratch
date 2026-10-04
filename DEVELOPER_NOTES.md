@@ -18,7 +18,7 @@ This will list all devices on the subnet along with their IP addresses.
 
 ## 1. Disable chrony on the server (PC)
 
-Most Linux systems (including the PC acting as the server here) already run `chrony` or `systemd-timesyncd` to keep their own clock in sync. Since our custom server needs to bind to UDP port 123 itself, any existing NTP daemon on that machine needs to be stopped first, otherwise the port will already be in use.
+Most Linux systems (including the PC acting as the server here) already run `chrony` or `systemd-timesyncd` to keep their own clock in sync. Since ntp-from-scratch needs to bind to UDP port 123 itself, any existing NTP daemon on that machine needs to be stopped first, otherwise the port will already be in use.
 
 On the server (PC):
 
@@ -100,7 +100,7 @@ Restart chrony on the client to pick up the change:
 sudo systemctl restart chrony
 ```
 
-Then verify the Pi is actually using the custom server as its source:
+Then verify the Pi is actually using ntp-from-scratch as its source:
 
 ```bash
 chronyc sources -v

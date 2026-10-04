@@ -1,6 +1,6 @@
-# NTP Server
+# ntp-from-scratch
 
-A custom NTP server that clients on a local network can reference for time synchronization.
+An NTP server built from scratch that clients on a local network can reference for time synchronization.
 
 ## Demo Video
 
