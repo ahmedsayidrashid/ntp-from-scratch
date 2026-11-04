@@ -4,7 +4,7 @@ This document covers how to set things up so the NTP server actually works end-t
 
 ## Reference Setup
 
-- **Server**: PC running `main.py` from this repo.
+- **Server**: PC running `src/main.py` from this repo.
 - **Client**: Raspberry Pi running `chrony` (the default NTP client/server).
 - **Network**: The Pi is connected to the PC via Ethernet, with the PC's Ethernet port configured to share its network connection (acting as a router/DHCP server for the Pi).
 
@@ -48,24 +48,24 @@ pip install -r requirements.txt
 
 ## 3. Run the script with sudo
 
-Linux treats any port below 1024 as privileged, and NTP uses port 123 by default. Because of this, `main.py` needs to be run with elevated permissions.
+Linux treats any port below 1024 as privileged, and NTP uses port 123 by default. Because of this, `src/main.py` needs to be run with elevated permissions.
 
 `sudo` normally resets `PATH` and won't use your activated venv's Python, so you need to either call the venv's interpreter directly by path, or use `sudo -E env "PATH=$PATH"` to preserve your environment:
 
 ```bash
-sudo .venv/bin/python3 main.py
+sudo .venv/bin/python3 src/main.py
 ```
 
 or:
 
 ```bash
-sudo -E env "PATH=$PATH" python3 main.py
+sudo -E env "PATH=$PATH" python3 src/main.py
 ```
 
 You can also override the port (e.g. for testing without root) using `--port`/`-p`:
 
 ```bash
-python3 main.py --port 12300
+python3 src/main.py --port 12300
 ```
 
 Optional flags:
