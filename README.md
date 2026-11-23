@@ -4,7 +4,7 @@ An NTP server built from scratch that clients on a local network can reference f
 
 ## Demo Video
 
-https://github.com/user-attachments/assets/b385a62f-0ba1-44c3-85a7-66934fb29d33
+<making some changes, new demo video coming soon!>
 
 ## Current Setup
 
