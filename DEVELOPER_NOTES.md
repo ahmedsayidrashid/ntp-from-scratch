@@ -1,116 +1,160 @@
 # Developer Notes
 
-This document covers how to set things up so the NTP server actually works end-to-end. It uses my own setup (PC as the server, Raspberry Pi as the client) as a reference.
+How to set things up so the server actually works end-to-end. It uses my own setup as a reference.
 
 ## Reference Setup
 
-- **Server**: PC running `src/main.py` from this repo.
-- **Client**: Raspberry Pi running `chrony` (the default NTP client/server).
-- **Network**: The Pi is connected to the PC via Ethernet, with the PC's Ethernet port configured to share its network connection (acting as a router/DHCP server for the Pi).
+- **Server**: Raspberry Pi 4 (Ubuntu 24.04) running `pps-ntpd` from `c/`, with an ATGM336H GPS module.
+- **Client**: my PC running `chrony`, taking its time from the Pi.
+- **Network**: the Pi is connected to the PC via Ethernet, with the PC's Ethernet port configured to share its network connection (acting as a router/DHCP server for the Pi). The PC is `10.42.0.1`, the Pi `10.42.0.97`.
 
-Since this setup uses a shared connection over an Ethernet cable, the Pi's IP address can be found by running the following command from the PC:
+The Pi's IP address can be found from the PC with:
 
 ```bash
 sudo nmap -sn 10.42.0.0/24
 ```
 
-This will list all devices on the subnet along with their IP addresses.
+## 1. Wire the GPS
 
-## 1. Disable chrony on the server (PC)
+| ATGM336H | Raspberry Pi 4 |
+|---|---|
+| VCC | 3.3 V (pin 1) |
+| GND | GND (pin 6) |
+| TX | GPIO 15 / UART RX (pin 10) |
+| PPS | GPIO 18 (pin 12) |
 
-Most Linux systems (including the PC acting as the server here) already run `chrony` or `systemd-timesyncd` to keep their own clock in sync. Since ntp-from-scratch needs to bind to UDP port 123 itself, any existing NTP daemon on that machine needs to be stopped first, otherwise the port will already be in use.
+The module needs a clear view of the sky (or an antenna near a window) to get a fix. Its PPS LED starts
+blinking once per second when it has one.
 
-On the server (PC):
+## 2. Enable the UART and PPS on the Pi
 
-```bash
-sudo systemctl stop chrony
-```
-
-This only stops it for the current session, chrony will start again on the next reboot, so you don't need to re-enable it later. If you want it to stay off across reboots too, you can additionally run `sudo systemctl disable chrony`, but that's optional.
-
-Verify the port is free:
-
-```bash
-sudo ss -ulnp | grep 123
-```
-
-If nothing is listening on `:123`, you're good to go.
-
-## 2. Set up a virtual environment and install dependencies
-
-Create an isolated venv so the project's dependencies don't get installed system-wide (also better practice).
-
-```bash
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
-```
-
-## 3. Run the script with sudo
-
-Linux treats any port below 1024 as privileged, and NTP uses port 123 by default. Because of this, `src/main.py` needs to be run with elevated permissions.
-
-`sudo` normally resets `PATH` and won't use your activated venv's Python, so you need to either call the venv's interpreter directly by path, or use `sudo -E env "PATH=$PATH"` to preserve your environment:
-
-```bash
-sudo .venv/bin/python3 src/main.py
-```
-
-or:
-
-```bash
-sudo -E env "PATH=$PATH" python3 src/main.py
-```
-
-You can also override the port (e.g. for testing without root) using `--port`/`-p`:
-
-```bash
-python3 src/main.py --port 12300
-```
-
-Optional flags:
-
-- `--time` / `-t`: serve a custom time instead of the current system time (ISO 8601 or Unix timestamp).
-- `NTP_CUSTOM_TIME` environment variable (see `.env.example`): same purpose as `--time`, useful for setting a default without passing a CLI arg every run.
-
-## 4. Set up the server as a valid reference on the client (Pi)
-
-On the client (the Raspberry Pi, or any machine running `chrony`), point chrony at the PC's IP address instead of the default pool of NTP servers.
-
-Edit `/etc/chrony/chrony.conf` (or `/etc/chrony.conf` depending on distro) on the Pi:
-
-```bash
-sudo nano /etc/chrony/chrony.conf
-```
-
-Comment out (or remove) the default `pool`/`server` lines, and add a line pointing to the PC's IP address (found via the `nmap` command above):
-
-For example:
+Add to `/boot/firmware/config.txt` under `[all]`, then reboot:
 
 ```text
-server 10.42.0.1 iburst prefer
+enable_uart=1
+dtoverlay=disable-bt
+dtoverlay=pps-gpio,gpiopin=18
 ```
 
-- `iburst` speeds up the initial synchronization by sending a burst of requests.
-- `prefer` tells chrony to prefer this source over any others, which is useful since our server is a "fake" stratum 1 source that isn't cross-checked against real sources.
+`disable-bt` gives the good UART (PL011) to GPIO 14/15, so the GPS shows up as **`/dev/ttyAMA0`**
+(Ubuntu has no `/dev/serial0` alias). Make sure no serial console is using it: `cmdline.txt` must not
+contain `console=serial0` or `console=ttyAMA0`.
 
-Restart chrony on the client to pick up the change:
+Check both signals:
+
+```bash
+ls -l /dev/pps0 /dev/ttyAMA0
+cat /sys/class/pps/pps0/assert          # run twice: the number after # should go up
+timeout 3 cat /dev/ttyAMA0              # NMEA text, including $GNRMC lines
+```
+
+Your user needs to be in the `dialout` group (`sudo usermod -aG dialout $USER`, then log in again).
+
+## 3. Stop chrony on the Pi from syncing to anything
+
+Most Linux systems already run `chrony` or `systemd-timesyncd`. On the Pi it must not bind UDP 123 and
+should not keep steering the clock that `pps-ntpd` is measuring. In `/etc/chrony/chrony.conf` on the Pi,
+comment out every `pool`/`server` line (in particular any line pointing back at the PC), then:
 
 ```bash
 sudo systemctl restart chrony
+chronyc sources                         # should list nothing
+sudo ss -ulnp | grep ':123 '            # should print nothing
 ```
 
-Then verify the Pi is actually using ntp-from-scratch as its source:
+Note: `pps-ntpd` corrects the time it *serves*; it does not set the Pi's own clock. The Pi's clock can
+drift or be off after a reboot without changing what clients receive.
+
+## 4. Build, test and install
 
 ```bash
-chronyc sources -v
-chronyc tracking
+sudo apt install build-essential
+cd c
+make && make test
+sudo make install                       # binary, systemd unit, udev rule for /dev/pps0
+sudo systemctl enable --now pps-ntpd
+journalctl -u pps-ntpd -f
 ```
 
-You should see the PC's IP listed with a `*` (currently selected source) once synchronization succeeds.
+Within a few seconds you should see:
 
-## Troubleshooting
+```text
+pair: first sample, GPS - system clock = +0.004710 s (RMC arrived 688 ms after edge)
+status: SYNCED  | fix=yes pps=60 rmc=60 pairs=60 | sys-err=-4711.804 us freq=+0.025 ppm jitter=1.378 us ...
+```
 
-- **`PermissionError` on the server**: you forgot `sudo` (see step 2).
-- **Client never syncs / source shows as unreachable**: double-check the server is actually running and bound to `0.0.0.0:123`, that no firewall is blocking UDP/123 between the two machines, and that the IP address in `chrony.conf` is correct (IPs can change if using DHCP).
-- **Client rejects the fake time**: chrony is cautious about large, sudden time jumps. If testing with a custom time far from the real time, you may need `makestep` configured more permissively on the client while testing, e.g. `makestep 1.0 -1` in `chrony.conf`.
+- `sys-err`: how far the Pi's own clock is from GPS (expected; see the note above).
+- `freq`: how fast the Pi's crystal drifts, in parts per million.
+- `jitter`: noise of the PPS fit. A few µs is normal.
+
+The service runs as an unprivileged user; `c/60-pps.rules` gives the `dialout` group access to
+`/dev/pps0`, and the unit grants only the right to bind port 123. `sudo make uninstall` removes it all.
+
+To run it by hand instead (e.g. while developing), stop the service and use a high port so no root is needed:
+
+```bash
+sudo systemctl stop pps-ntpd
+./build/pps-ntpd -p 12300 -v
+python3 tests/ntp_query.py 127.0.0.1 12300 5
+```
+
+## 5. Use the Pi as the time source on the PC
+
+On the PC, edit `/etc/chrony/chrony.conf` (or `/etc/chrony.conf` depending on distro):
+
+```text
+server 10.42.0.97 iburst prefer
+```
+
+Keeping the default `pool` lines as well is a good sanity check: chrony will pick the Pi (lowest stratum
+and error) but still notice if it disagrees with the internet. Then:
+
+```bash
+sudo systemctl restart chrony
+chronyc sources -v                      # 10.42.0.97 should get a '*' and show stratum 1
+chronyc tracking                        # Reference ID should be the Pi, Stratum 2
+```
+
+From a Mac: `sntp 10.42.0.97`.
+
+If the PC used to serve time to the Pi (the old setup), it's fine to leave its `allow` lines; the Pi no
+longer asks it.
+
+## 6. Fake time (breaking things on purpose)
+
+```bash
+sudo systemctl stop pps-ntpd
+sudo ./build/pps-ntpd -t 2038-01-19T03:14:00Z
+```
+
+chrony refuses large jumps by default. On the client, while testing, allow it to step any amount at
+any time:
+
+```text
+makestep 1.0 -1
+```
+
+and restart chrony. Undo both afterwards (`sudo systemctl start pps-ntpd`, remove the `makestep` line),
+then `sudo chronyc makestep` on the client to jump back to real time.
+
+## Debugging the GPS
+
+```bash
+./build/pps-ntpd -D -p 12300            # every $GNRMC sentence and every PPS edge with its spacing
+make tools && ./build/gps_pps_reader    # standalone reader (needs pps-tools headers)
+```
+
+- **`pps: no pulses for 3 s`**: no fix yet (move the antenna), or PPS not on GPIO 18 / overlay missing.
+- **`nmea: cannot open /dev/ttyAMA0`**: not in `dialout`, or the UART isn't enabled.
+- **First sample says GPS − system is about ±1 s**: the sentence is being paired with the wrong edge.
+  If the Pi's clock was already right, restart with `-L -1` or `-L 1`.
+- **Clients see stratum 16 / refid `INIT`**: the server is up but not synced yet (needs ~4 s of PPS), or
+  PPS has been missing for longer than the holdover (`-H`, 300 s).
+- **`cannot bind UDP port 123`**: something else (chrony, ntpd) already owns it; see step 3.
+
+## Troubleshooting the network
+
+- **Client never syncs / source shows as unreachable**: check the server is running
+  (`systemctl status pps-ntpd`), that no firewall blocks UDP/123 between the two machines, and that the
+  IP in `chrony.conf` is right (it can change with DHCP).
+- **Client rejects the fake time**: see the `makestep` note in section 6.
