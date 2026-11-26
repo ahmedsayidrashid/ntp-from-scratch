@@ -48,8 +48,17 @@ tools: $(BUILD)/gps_pps_reader
 install: $(BIN)
 	install -m 755 $(BIN) $(PREFIX)/bin/pps-ntpd
 	install -m 644 pps-ntpd.service /etc/systemd/system/pps-ntpd.service
+	install -m 644 60-pps.rules /etc/udev/rules.d/60-pps.rules
+	udevadm control --reload && udevadm trigger --action=add --subsystem-match=pps
+	systemctl daemon-reload
+	@echo "installed - now: sudo systemctl enable --now pps-ntpd"
+
+uninstall:
+	-systemctl disable --now pps-ntpd
+	rm -f $(PREFIX)/bin/pps-ntpd /etc/systemd/system/pps-ntpd.service /etc/udev/rules.d/60-pps.rules
+	systemctl daemon-reload
 
 clean:
 	rm -rf $(BUILD)
 
-.PHONY: all test tools install clean
+.PHONY: all test tools install uninstall clean

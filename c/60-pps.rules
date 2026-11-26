@@ -1,0 +1,3 @@
+# Let the dialout group (which already owns the GPS UART) read the PPS device,
+# so pps-ntpd does not need to run as root.
+KERNEL=="pps[0-9]*", GROUP="dialout", MODE="0660"
