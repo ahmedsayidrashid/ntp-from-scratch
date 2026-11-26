@@ -12,6 +12,7 @@ typedef struct {
     int  label_shift;       /* seconds added to the NMEA label for the paired edge (default 0) */
     bool fake;              /* no hardware: feed samples from the system clock (testing) */
     bool verbose;
+    bool debug;             /* log every RMC sentence and every PPS edge */
 } refclock_cfg_t;
 
 typedef struct {

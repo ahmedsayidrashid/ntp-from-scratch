@@ -54,7 +54,8 @@ static void usage(const char *prog)
             "  -f       fake mode: no GPS, discipline to system clock (for testing)\n"
             "  -t TIME  serve a made-up time instead (ISO 8601 or Unix seconds, e.g.\n"
             "           2038-01-19T03:14:00Z); also read from $NTP_CUSTOM_TIME\n"
-            "  -v       verbose (every sample and every client)\n",
+            "  -v       verbose (every sample and every client)\n"
+            "  -D       debug the GPS: log every RMC sentence and every PPS edge\n",
             prog);
 }
 
@@ -66,7 +67,7 @@ int main(int argc, char **argv)
     const char      *custom   = NULL;
 
     int opt;
-    while ((opt = getopt(argc, argv, "d:s:b:p:L:H:S:t:fvh")) != -1) {
+    while ((opt = getopt(argc, argv, "d:s:b:p:L:H:S:t:fvDh")) != -1) {
         switch (opt) {
         case 'd': rc.pps_dev = optarg; break;
         case 's': rc.serial_dev = optarg; break;
@@ -78,6 +79,7 @@ int main(int argc, char **argv)
         case 'f': rc.fake = true; break;
         case 't': custom = optarg; break;
         case 'v': rc.verbose = sc.verbose = true; break;
+        case 'D': rc.debug = true; break;
         default: usage(argv[0]); return opt == 'h' ? 0 : 2;
         }
     }

@@ -16,6 +16,7 @@
 #include <pthread.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 #include <unistd.h>
 
 #define PAIR_WINDOW_NS (950LL * 1000000LL)
@@ -70,6 +71,18 @@ static void *pps_thread(void *arg)
         if (timed_out) logmsg("pps: pulses resumed");
         timed_out = false;
 
+        if (C.debug) {
+            static int64_t prev_ns;
+            static uint32_t prev_seq;
+            if (prev_ns && e.seq != prev_seq)
+                logmsg("pps: edge seq=%u at %lld.%09lld  dt=%.6f s (%+.3f us from 1 s)", e.seq,
+                       (long long)(e.sys_ns / NS_PER_SEC), (long long)(e.sys_ns % NS_PER_SEC),
+                       (double)(e.sys_ns - prev_ns) / 1e9,
+                       ((double)(e.sys_ns - prev_ns) / (double)(e.seq - prev_seq) - 1e9) / 1e3);
+            prev_ns  = e.sys_ns;
+            prev_seq = e.seq;
+        }
+
         pthread_mutex_lock(&mtx);
         if (!have_edge || e.seq != latest_edge.seq) {
             latest_edge = e;
@@ -94,6 +107,15 @@ static void handle_line(const char *line, int64_t rx_ns)
 {
     nmea_rmc_t rmc;
     if (!nmea_parse_rmc(line, &rmc)) return;
+
+    if (C.debug) {
+        struct tm tm;
+        time_t    t = rmc.utc_sec;
+        gmtime_r(&t, &tm);
+        logmsg("nmea: RMC %04d-%02d-%02dT%02d:%02d:%02dZ fix=%s lat=%.6f lon=%.6f", tm.tm_year + 1900,
+               tm.tm_mon + 1, tm.tm_mday, tm.tm_hour, tm.tm_min, tm.tm_sec, rmc.valid ? "A" : "V",
+               rmc.lat, rmc.lon);
+    }
 
     pthread_mutex_lock(&mtx);
     S.rmc_sentences++;

@@ -19,6 +19,11 @@ int main(void)
     CHECK(fabs(r.lat - 51.477760) < 1e-5);
     CHECK(fabs(r.lon - -0.0) < 1e-5);
 
+    /* ATGM336H 12-field NMEA 4.0 form (no nav-status field); position replaced with Greenwich */
+    CHECK(nmea_parse_rmc("$GNRMC,000551.000,A,5128.66560,N,00000.00000,W,2.34,346.67,261126,,,A*6B\r\n", &r));
+    CHECK(r.valid);
+    CHECK(r.utc_sec == 1795651551); /* 2026-11-26 00:05:51 UTC */
+
     /* No-fix sentence parses but is flagged invalid */
     CHECK(nmea_parse_rmc("$GPRMC,000000.000,V,,,,,,,010125,,,N*4A", &r));
     CHECK(!r.valid);
