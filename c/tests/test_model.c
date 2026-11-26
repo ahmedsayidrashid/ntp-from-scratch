@@ -40,6 +40,15 @@ int main(void)
 
     CHECK(!model_time(gps, &out, &st));
 
+    /* Too few samples: offset is applied, but we must not claim to be synced */
+    for (int i = 0; i < 3; i++, gps += NS_PER_SEC)
+        model_add_sample(sys_at(gps, off0, ppm), gps);
+    CHECK(!model_time(sys_at(gps, off0, ppm), &out, &st));
+    CHECK(st.nfit == 3);
+    CHECK(llabs(out - gps) < 100000); /* already within 100 us of GPS */
+    model_init(4, 300.0, false);
+    gps = 1794790000LL * NS_PER_SEC;
+
     for (int i = 0; i < 40; i++, gps += NS_PER_SEC)
         model_add_sample(sys_at(gps, off0, ppm) + (int64_t)noise_ns(), gps);
 
