@@ -3,3 +3,9 @@ venv/
 
 # Ignore .env
 .env
+.venv/
+
+# Build outputs
+c/build/
+a.out
+*.tar.gz
