@@ -1,0 +1,18 @@
+[Unit]
+Description=pps-ntpd - stratum-1 NTP server disciplined by GPS PPS
+After=network.target dev-pps0.device
+Wants=dev-pps0.device
+
+[Service]
+ExecStart=/usr/local/bin/pps-ntpd -d /dev/pps0 -s /dev/ttyAMA0 -b 9600 -p 123
+Restart=on-failure
+RestartSec=3
+# Needs /dev/pps0, the serial port and UDP 123; runs as root with a reduced footprint.
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+Nice=-10
+
+[Install]
+WantedBy=multi-user.target
