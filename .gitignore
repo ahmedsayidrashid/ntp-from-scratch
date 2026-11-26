@@ -8,4 +8,3 @@ venv/
 # Build outputs
 c/build/
 a.out
-*.tar.gz
